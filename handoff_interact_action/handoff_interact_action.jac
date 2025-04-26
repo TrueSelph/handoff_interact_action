@@ -636,34 +636,53 @@ Query: {query}
     }
 
 
-    can healthcheck() -> bool {
+    can healthcheck() -> Union[bool, dict] {
         try {
-            if(
-                self.directive and
-                self.select_handoff_prompt and
-                self.ask_confirmation_prompt and
-                self.request_correct_info_directive and
-                self.query_reply_prompt and
-                self.extract_answer_prompt and
-                self.model_op and
-                self.model_name and
-                self.model_action and
-                self.model_temperature and
-                self.model_max_tokens and
-                self.experts_numbers and
-                self.worksheet_title and
-                self.vector_store_action and
-                self.confirm_function and
-                self.handoff_functions and
+            # Check if critical attributes are set
+            if (
+                not self.directive or
+                not self.select_handoff_prompt or
+                not self.ask_confirmation_prompt or
+                not self.request_correct_info_directive or
+                not self.query_reply_prompt or
+                not self.extract_answer_prompt or
+                not self.model_op or
+                not self.model_name or
+                not self.model_action or
+                not self.model_temperature or
+                not self.model_max_tokens or
+                not self.worksheet_title or
+                not self.vector_store_action or
+                not self.confirm_function or
+                not self.handoff_functions or
                 self.max_statement_length > 0
             ) {
-                return True;
+                return {
+                    "status": False,
+                    "message": "One or more critical attributes are missing or invalid.",
+                    "severity": "error"
+                };
             }
-            return False;
+
+            # Check if experts_numbers list is populated
+            if (not self.experts_numbers) {
+                return {
+                    "status": False,
+                    "message": "Experts numbers list is empty.",
+                    "severity": "error"
+                };
+            }
+
+            # If all checks pass
+            return True;
+
         } except Exception as e {
             self.logger.error(f"An exception occurred in {self.label}:\n{traceback.format_exc()}\n");
-            return False;
+            return {
+                "status": False,
+                "message": f"An error occurred during healthcheck: {e}",
+                "severity": "error"
+            };
         }
     }
-
 }
