@@ -1,1 +1,3 @@
-include:jac handoff_interact_action;
+import from actions.jivas.handoff_interact_action {
+    handoff_interact_action
+}

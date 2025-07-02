@@ -1,15 +1,15 @@
-import:py random;
-import:py uuid;
-import:py logging;
-import:py traceback;
-import:py from logging { Logger }
-import:py from jivas.agent.modules.agentlib.utils { Utils }
-import:jac from jivas.agent.memory.interaction_response { TextInteractionMessage }
-import:jac from jivas.agent.action.interact_action { InteractAction }
-import:jac from jivas.agent.action.interact_graph_walker { interact_graph_walker }
+import random;
+import uuid;
+import logging;
+import traceback;
+import from logging { Logger }
+import from jivas.agent.modules.agentlib.utils { Utils }
+import from jivas.agent.memory.interaction_response { TextInteractionMessage }
+import from jivas.agent.action.interact_action { InteractAction }
+import from jivas.agent.action.interact_graph_walker { interact_graph_walker }
 
 
-node HandoffInteractAction :InteractAction: {
+node HandoffInteractAction(InteractAction) {
     has directive: str = "Your goal is to let the user know that you are unable to answer the request and will get back to them later.";
     has select_handoff_prompt:str = """
 Select the most relevant query from the worksheet based on the user_message.
@@ -128,7 +128,7 @@ Query: {query}
 
 
 
-    can touch(visitor: interact_graph_walker) -> bool {
+    def touch(visitor: interact_graph_walker) -> bool {
         if (visitor.utterance) {
             return True;
         }
@@ -136,7 +136,7 @@ Query: {query}
     }
 
 
-    can execute(visitor: interact_graph_walker) -> dict {
+    def execute(visitor: interact_graph_walker) -> None {
 
         if(visitor.session_id in self.experts_numbers) {
             self.handle_expert_response(visitor=visitor);
@@ -144,10 +144,9 @@ Query: {query}
             self.handle_user_response(visitor=visitor);
         }
 
-        return visitor.export();
     }
 
-    can get_query(visitor: interact_graph_walker) -> dict {
+    def get_query(visitor: interact_graph_walker) -> dict {
         queries = [];
 
         # get and update sheet
@@ -198,7 +197,7 @@ Query: {query}
     }
 
 
-    can update_query(visitor: interact_graph_walker, query:str, session_id:str, query_answer:str, query_status:str) -> dict {
+    def update_query(visitor: interact_graph_walker, query:str, session_id:str, query_answer:str, query_status:str) -> dict {
         if(query_status == "resolved") {
             query_result = self.get_query(visitor=visitor);
             last_query_id = visitor.frame_node.variable_get(key="last_query_id");
@@ -250,7 +249,7 @@ Query: {query}
     }
 
 
-    can select_query(visitor: interact_graph_walker) -> dict {
+    def select_query(visitor: interact_graph_walker) -> dict {
 
         whatsapp_chat = visitor.interaction_node.get_data_item(label = "whatsapp_chat");
         replied_message = "";
@@ -282,11 +281,9 @@ Query: {query}
                 prompt_messages = prompt_messages,
                 prompt_variables = prompt_variables,
                 interaction_node = visitor.interaction_node,
-                kwargs = {
-                    "model_name": self.model_name,
-                    "model_temperature": self.model_temperature,
-                    "model_max_tokens": self.model_max_tokens
-                },
+                model_name = self.model_name,
+                model_temperature = self.model_temperature,
+                model_max_tokens = self.model_max_tokens,
                 logging = False
             )) {
                 result = model_action_result.get_json_result();
@@ -312,7 +309,7 @@ Query: {query}
     }
 
 
-    can extract_answer(visitor: interact_graph_walker, query:str) -> str {
+    def extract_answer(visitor: interact_graph_walker, query:str) -> str {
         # extract query answer
         result = {};
         if(model_action := self.get_agent().get_actions().get(action_label=self.model_action)) {
@@ -329,11 +326,9 @@ Query: {query}
                 prompt_messages = prompt_messages,
                 prompt_variables = prompt_variables,
                 interaction_node = visitor.interaction_node,
-                kwargs = {
-                    "model_name": self.model_name,
-                    "model_temperature": self.model_temperature,
-                    "model_max_tokens": self.model_max_tokens
-                },
+                model_name = self.model_name,
+                model_temperature = self.model_temperature,
+                model_max_tokens = self.model_max_tokens,
                 logging = False
             )) {
                 result = model_action_result.get_json_result();
@@ -344,7 +339,7 @@ Query: {query}
     }
 
 
-    can handle_expert_response(visitor: interact_graph_walker) -> bool {
+    def handle_expert_response(visitor: interact_graph_walker) -> bool {
 
         query = self.select_query(visitor=visitor);
         if(query){
@@ -381,11 +376,9 @@ Query: {query}
                             prompt_messages = prompt_messages,
                             prompt_variables = prompt_variables,
                             interaction_node = visitor.interaction_node,
-                            kwargs = {
-                                "model_name": self.model_name,
-                                "model_temperature": self.model_temperature,
-                                "model_max_tokens": self.model_max_tokens
-                            },
+                            model_name = self.model_name,
+                            model_temperature = self.model_temperature,
+                            model_max_tokens = self.model_max_tokens,
                             logging = False
                         )) {
 
@@ -411,7 +404,7 @@ Query: {query}
     }
 
 
-    can confirm_info(visitor: interact_graph_walker, data:dict) -> bool {
+    def confirm_info(visitor: interact_graph_walker, data:dict) -> bool {
         entities = list(self.confirm_function[0]['function']['parameters']['properties'].keys());
         agent_status = visitor.frame_node.variable_get(key=f"{self.label}_confirmation");
         confirmation_status = False;
@@ -431,12 +424,10 @@ Query: {query}
                 if (model_action_result := model_action.call_model(
                     prompt_messages = prompt_messages,
                     prompt_variables = {},
-                    kwargs = {
-                        "functions": self.confirm_function,
-                        "model_name": self.model_name,
-                        "model_temperature": self.model_temperature,
-                        "model_max_tokens": self.model_max_tokens
-                    },
+                    functions = self.confirm_function,
+                    model_name = self.model_name,
+                    model_temperature = self.model_temperature,
+                    model_max_tokens = self.model_max_tokens,
                     interaction_node = visitor.interaction_node,
                     logging = False
                 )) {
@@ -478,11 +469,9 @@ Query: {query}
                         prompt_messages = prompt_messages,
                         prompt_variables = prompt_variables,
                         interaction_node = visitor.interaction_node,
-                        kwargs = {
-                            "model_name": self.model_name,
-                            "model_temperature": self.model_temperature,
-                            "model_max_tokens": self.model_max_tokens
-                        },
+                        model_name = self.model_name,
+                        model_temperature = self.model_temperature,
+                        model_max_tokens = self.model_max_tokens,
                         logging = False
                     )) {
                         result = model_action_result.get_result();
@@ -501,7 +490,7 @@ Query: {query}
     }
 
 
-    can ask_confirmation_question(visitor: interact_graph_walker, data:dict) -> bool {
+    def ask_confirmation_question(visitor: interact_graph_walker, data:dict) -> bool {
 
         # ask first confirmaiton question
         visitor.frame_node.variable_set(key=f"{self.label}_confirmation",value="ask_confirmation_prompt");
@@ -523,11 +512,9 @@ Query: {query}
                 prompt_messages = prompt_messages,
                 prompt_variables = prompt_variables,
                 interaction_node = visitor.interaction_node,
-                kwargs = {
-                    "model_name": self.model_name,
-                    "model_temperature": self.model_temperature,
-                    "model_max_tokens": self.model_max_tokens
-                },
+                model_name = self.model_name,
+                model_temperature = self.model_temperature,
+                model_max_tokens = self.model_max_tokens,
                 logging = False
             )) {
 
@@ -543,7 +530,7 @@ Query: {query}
     }
 
 
-    can reset_action(visitor: interact_graph_walker) -> bool {
+    def reset_action(visitor: interact_graph_walker) -> bool {
 
         if(not self.update_store){
             last_query_id = visitor.frame_node.variable_get(key="last_query_id");
@@ -558,7 +545,7 @@ Query: {query}
     }
 
 
-    can handle_user_response(visitor: interact_graph_walker) -> dict {
+    def handle_user_response(visitor: interact_graph_walker) -> dict {
         extracted_info = {};
 
         if(model_action := self.get_agent().get_actions().get(action_label=self.model_action)) {
@@ -569,12 +556,10 @@ Query: {query}
             if (model_action_result := model_action.call_model(
                 prompt_messages = prompt_messages,
                 prompt_variables = {},
-                kwargs = {
-                    "functions": self.handoff_functions,
-                    "model_name": self.model_name,
-                    "model_temperature": self.model_temperature,
-                    "model_max_tokens": self.model_max_tokens
-                },
+                functions = self.handoff_functions,
+                model_name = self.model_name,
+                model_temperature = self.model_temperature,
+                model_max_tokens = self.model_max_tokens,
                 interaction_node = visitor.interaction_node,
                 logging = False
             )) {
@@ -604,11 +589,9 @@ Query: {query}
                     prompt_messages = prompt_messages,
                     prompt_variables = prompt_variables,
                     interaction_node = visitor.interaction_node,
-                    kwargs = {
-                        "model_name": self.model_name,
-                        "model_temperature": self.model_temperature,
-                        "model_max_tokens": self.model_max_tokens
-                    },
+                    model_name = self.model_name,
+                    model_temperature = self.model_temperature,
+                    model_max_tokens = self.model_max_tokens,
                     logging = False
                 )) {
                     result = model_action_result.get_result();
@@ -636,7 +619,7 @@ Query: {query}
     }
 
 
-    can healthcheck() -> Union[bool, dict] {
+    def healthcheck() -> Union[bool, dict] {
         try {
             # Check if critical attributes are set
             if (
