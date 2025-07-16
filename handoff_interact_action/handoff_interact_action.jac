@@ -6,7 +6,7 @@ import from logging { Logger }
 import from jivas.agent.modules.agentlib.utils { Utils }
 import from jivas.agent.memory.interaction_response { TextInteractionMessage }
 import from jivas.agent.action.interact_action { InteractAction }
-import from jivas.agent.action.interact_graph_walker { interact_graph_walker }
+import from jivas.agent.action.agent_graph_walker { agent_graph_walker }
 
 
 node HandoffInteractAction(InteractAction) {
@@ -62,7 +62,7 @@ Query: {query}
     has history_size: int = 3;
     has max_statement_length: int = 1000;
     has model_op: str = "chatopenai";
-    has model_name: str = "gpt-4o";
+    has model_name: str = "gpt-4.1";
     has model_action: str = "LangChainModelAction";
     has model_temperature: float = 0.2;
     has model_max_tokens:int = 4000;
@@ -128,7 +128,7 @@ Query: {query}
 
 
 
-    def touch(visitor: interact_graph_walker) -> bool {
+    def touch(visitor: agent_graph_walker) -> bool {
         if (visitor.utterance) {
             return True;
         }
@@ -136,7 +136,7 @@ Query: {query}
     }
 
 
-    def execute(visitor: interact_graph_walker) -> None {
+    def execute(visitor: agent_graph_walker) -> None {
 
         if(visitor.session_id in self.experts_numbers) {
             self.handle_expert_response(visitor=visitor);
@@ -146,7 +146,7 @@ Query: {query}
 
     }
 
-    def get_query(visitor: interact_graph_walker) -> dict {
+    def get_query(visitor: agent_graph_walker) -> dict {
         queries = [];
 
         # get and update sheet
@@ -197,10 +197,10 @@ Query: {query}
     }
 
 
-    def update_query(visitor: interact_graph_walker, query:str, session_id:str, query_answer:str, query_status:str) -> dict {
+    def update_query(visitor: agent_graph_walker, query:str, session_id:str, query_answer:str, query_status:str) -> dict {
         if(query_status == "resolved") {
             query_result = self.get_query(visitor=visitor);
-            last_query_id = visitor.frame_node.variable_get(key="last_query_id");
+            last_query_id = visitor.frame_node.data_get(key="last_query_id");
             current_query = {};
 
             for q in query_result['queries'] {
@@ -249,12 +249,12 @@ Query: {query}
     }
 
 
-    def select_query(visitor: interact_graph_walker) -> dict {
+    def select_query(visitor: agent_graph_walker) -> dict {
 
-        whatsapp_chat = visitor.interaction_node.get_data_item(label = "whatsapp_chat");
+        whatsapp_chat = visitor.interaction_node.data_get(key = "whatsapp_chat");
         replied_message = "";
         if(whatsapp_chat){
-            replied_message = whatsapp_chat.content.get('parent_message').get('body');
+            replied_message = whatsapp_chat.get('parent_message').get('body');
         }
 
 
@@ -294,10 +294,10 @@ Query: {query}
         query="";
         if(result) {
             query_id = result.get("id");
-            visitor.frame_node.variable_set(key="last_query_id", value=query_id);
+            visitor.frame_node.data_set(key="last_query_id", value=query_id);
 
         }else{
-            query_id = visitor.frame_node.variable_get(key="last_query_id");
+            query_id = visitor.frame_node.data_get(key="last_query_id");
         }
 
         for q in filtered_worksheet{
@@ -309,7 +309,7 @@ Query: {query}
     }
 
 
-    def extract_answer(visitor: interact_graph_walker, query:str) -> str {
+    def extract_answer(visitor: agent_graph_walker, query:str) -> str {
         # extract query answer
         result = {};
         if(model_action := self.get_agent().get_actions().get(action_label=self.model_action)) {
@@ -339,7 +339,7 @@ Query: {query}
     }
 
 
-    def handle_expert_response(visitor: interact_graph_walker) -> bool {
+    def handle_expert_response(visitor: agent_graph_walker) -> bool {
 
         query = self.select_query(visitor=visitor);
         if(query){
@@ -404,9 +404,9 @@ Query: {query}
     }
 
 
-    def confirm_info(visitor: interact_graph_walker, data:dict) -> bool {
+    def confirm_info(visitor: agent_graph_walker, data:dict) -> bool {
         entities = list(self.confirm_function[0]['function']['parameters']['properties'].keys());
-        agent_status = visitor.frame_node.variable_get(key=f"{self.label}_confirmation");
+        agent_status = visitor.frame_node.data_get(key=f"{self.label}_confirmation");
         confirmation_status = False;
 
         if (not agent_status) {
@@ -458,7 +458,7 @@ Query: {query}
                     confirmation_status = True;
                 } else {
                     # confirmation is incorrect and ask for correct info
-                    visitor.frame_node.variable_set(key=f"{self.label}_confirmation",value="request_correct_info_directive");
+                    visitor.frame_node.data_set(key=f"{self.label}_confirmation",value="request_correct_info_directive");
 
                     prompt_messages = (visitor.frame_node.get_transcript_statements(interactions=self.history_size,max_statement_length=self.max_statement_length));
                     prompt_messages = prompt_messages[:-1];
@@ -490,10 +490,10 @@ Query: {query}
     }
 
 
-    def ask_confirmation_question(visitor: interact_graph_walker, data:dict) -> bool {
+    def ask_confirmation_question(visitor: agent_graph_walker, data:dict) -> bool {
 
         # ask first confirmaiton question
-        visitor.frame_node.variable_set(key=f"{self.label}_confirmation",value="ask_confirmation_prompt");
+        visitor.frame_node.data_set(key=f"{self.label}_confirmation",value="ask_confirmation_prompt");
 
         # selecting id
         result = None;
@@ -530,22 +530,22 @@ Query: {query}
     }
 
 
-    def reset_action(visitor: interact_graph_walker) -> bool {
+    def reset_action(visitor: agent_graph_walker) -> bool {
 
         if(not self.update_store){
-            last_query_id = visitor.frame_node.variable_get(key="last_query_id");
+            last_query_id = visitor.frame_node.data_get(key="last_query_id");
             typesense_vector_store_action = visitor.agent_node.get_actions().get(action_label=self.vector_store_action);
             typesense_vector_store_action.delete_document(last_query_id);
         }
 
-        visitor.frame_node.variable_set(key=f"{self.label}_confirmation",value="");
-        visitor.frame_node.variable_set(key="last_query_id", value="");
+        visitor.frame_node.data_set(key=f"{self.label}_confirmation",value="");
+        visitor.frame_node.data_set(key="last_query_id", value="");
 
         return True;
     }
 
 
-    def handle_user_response(visitor: interact_graph_walker) -> dict {
+    def handle_user_response(visitor: agent_graph_walker) -> dict {
         extracted_info = {};
 
         if(model_action := self.get_agent().get_actions().get(action_label=self.model_action)) {
